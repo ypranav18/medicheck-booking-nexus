@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -9,8 +8,11 @@ import { doctors, Doctor } from "@/data/doctors";
 import DoctorCard from "@/components/DoctorCard";
 import { toast } from "sonner";
 import { Search, Calendar, Check } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
 const AppointmentForm = () => {
+  const navigate = useNavigate();
   const [specialty, setSpecialty] = useState("");
   const [name, setName] = useState("");
   const [activeTab, setActiveTab] = useState("search");
@@ -34,23 +36,79 @@ const AppointmentForm = () => {
     setActiveTab("details");
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // In a real application, this would send the appointment data to the backend
-    toast.success("Appointment booked successfully!", {
-      description: `Your appointment with ${selectedDoctor?.name} on ${selectedDay} at ${selectedTime} has been confirmed.`,
-      duration: 5000,
-    });
-    
-    // Reset form
-    setSpecialty("");
-    setName("");
-    setSelectedDoctor(null);
-    setSelectedDay(null);
-    setSelectedTime(null);
-    setAppointmentReason("");
-    setActiveTab("search");
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast.error("Please sign in to book an appointment");
+        navigate("/signin");
+        return;
+      }
+
+      if (!selectedDoctor || !selectedDay || !selectedTime) {
+        toast.error("Please select a doctor, day and time");
+        return;
+      }
+
+      // Store appointment in Supabase
+      const { error: appointmentError } = await supabase
+        .from('appointments')
+        .insert([
+          {
+            user_id: user.id,
+            doctor_id: selectedDoctor.id,
+            doctor_name: selectedDoctor.name,
+            doctor_specialty: selectedDoctor.specialty,
+            appointment_date: selectedDay,
+            appointment_time: selectedTime,
+            reason: appointmentReason,
+          }
+        ]);
+
+      if (appointmentError) {
+        throw appointmentError;
+      }
+
+      // Send confirmation email
+      const { error: emailError } = await supabase.functions.invoke('send-appointment-confirmation', {
+        body: {
+          doctorName: selectedDoctor.name,
+          doctorSpecialty: selectedDoctor.specialty,
+          date: selectedDay,
+          time: selectedTime,
+          patientEmail: user.email,
+          patientName: user.email?.split('@')[0] || 'Patient',
+          reason: appointmentReason,
+        },
+      });
+
+      if (emailError) {
+        console.error('Error sending confirmation email:', emailError);
+        // Don't throw here - appointment was saved successfully
+      }
+
+      toast.success("Appointment booked successfully!", {
+        description: `Your appointment with ${selectedDoctor.name} on ${selectedDay} at ${selectedTime} has been confirmed.`,
+        duration: 5000,
+      });
+      
+      // Reset form
+      setSpecialty("");
+      setName("");
+      setSelectedDoctor(null);
+      setSelectedDay(null);
+      setSelectedTime(null);
+      setAppointmentReason("");
+      setActiveTab("search");
+      
+    } catch (error: any) {
+      toast.error("Failed to book appointment", {
+        description: error.message,
+      });
+    }
   };
 
   return (
