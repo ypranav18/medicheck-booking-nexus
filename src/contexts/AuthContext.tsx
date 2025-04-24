@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
@@ -22,20 +21,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
         setSession(newSession);
         setUser(newSession?.user ?? null);
 
-        // For debugging
         if (event) {
           console.log('Supabase auth event:', event);
         }
       }
     );
 
-    // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
@@ -68,7 +64,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, name: string) => {
     try {
-      // Modified to disable email confirmation
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -80,27 +75,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        switch (error.code) {
+          case 'over_email_send_rate_limit':
+            toast({
+              title: "Sign Up Limit Reached",
+              description: "Too many sign-up attempts. Please wait 15-30 minutes and try again.",
+              variant: "destructive",
+            });
+            break;
+          default:
+            toast({
+              title: "Sign up failed",
+              description: error.message || "Unable to create account. Please try again.",
+              variant: "destructive",
+            });
+        }
+        return { error };
+      }
       
-      // Auto sign-in after registration since we're not requiring email confirmation
       if (data.user) {
         toast({
           title: "Account created successfully!",
           description: "You have been signed in automatically.",
         });
         
-        // Wait a moment before redirecting to ensure state is updated
         setTimeout(() => {
           window.location.href = '/';
         }, 1500);
       }
       
       return { error: null };
-    } catch (error) {
-      console.error('Error signing up:', error);
+    } catch (error: any) {
+      console.error('Unexpected error signing up:', error);
       toast({
-        title: "Sign up failed",
-        description: error.message || "Unable to create account. Please try again.",
+        title: "Unexpected Error",
+        description: "An unexpected error occurred. Please try again later.",
         variant: "destructive",
       });
       return { error };
