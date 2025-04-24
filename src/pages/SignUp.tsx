@@ -1,10 +1,10 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { useToast } from "@/hooks/use-toast";
+import { useAuth } from '@/contexts/AuthContext';
 
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -31,8 +31,14 @@ const formSchema = z.object({
 });
 
 const SignUp = () => {
-  const { toast } = useToast();
+  const { signUp, user } = useAuth();
   const navigate = useNavigate();
+  
+  useEffect(() => {
+    if (user) {
+      navigate('/');
+    }
+  }, [user, navigate]);
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -44,15 +50,11 @@ const SignUp = () => {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    // For now, we'll just create a mock registration
-    // In a real app, this would connect to your authentication backend
-    if (values.email && values.password) {
-      toast({
-        title: "Account created!",
-        description: "You have successfully signed up.",
-      });
-      navigate('/signin');
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    try {
+      await signUp(values.email, values.password, values.name);
+    } catch (error) {
+      console.error("Error during sign up:", error);
     }
   }
 

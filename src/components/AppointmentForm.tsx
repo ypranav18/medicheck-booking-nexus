@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -10,9 +11,11 @@ import { toast } from "sonner";
 import { Search, Calendar, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 const AppointmentForm = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [specialty, setSpecialty] = useState("");
   const [name, setName] = useState("");
   const [activeTab, setActiveTab] = useState("search");
@@ -20,6 +23,13 @@ const AppointmentForm = () => {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [appointmentReason, setAppointmentReason] = useState("");
+  const [isRedirecting, setIsRedirecting] = useState(false);
+
+  useEffect(() => {
+    if (isRedirecting && !user) {
+      navigate("/signin");
+    }
+  }, [isRedirecting, user, navigate]);
 
   const filteredDoctors = doctors.filter(doctor => {
     const matchesSpecialty = specialty === "" || 
@@ -40,11 +50,9 @@ const AppointmentForm = () => {
     e.preventDefault();
     
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
       if (!user) {
         toast.error("Please sign in to book an appointment");
-        navigate("/signin");
+        setIsRedirecting(true);
         return;
       }
 
@@ -56,17 +64,15 @@ const AppointmentForm = () => {
       // Store appointment in Supabase
       const { error: appointmentError } = await supabase
         .from('appointments')
-        .insert([
-          {
-            user_id: user.id,
-            doctor_id: selectedDoctor.id,
-            doctor_name: selectedDoctor.name,
-            doctor_specialty: selectedDoctor.specialty,
-            appointment_date: selectedDay,
-            appointment_time: selectedTime,
-            reason: appointmentReason,
-          }
-        ]);
+        .insert({
+          user_id: user.id,
+          doctor_id: selectedDoctor.id.toString(),
+          doctor_name: selectedDoctor.name,
+          doctor_specialty: selectedDoctor.specialty,
+          appointment_date: selectedDay,
+          appointment_time: selectedTime,
+          reason: appointmentReason,
+        });
 
       if (appointmentError) {
         throw appointmentError;
@@ -80,7 +86,7 @@ const AppointmentForm = () => {
           date: selectedDay,
           time: selectedTime,
           patientEmail: user.email,
-          patientName: user.email?.split('@')[0] || 'Patient',
+          patientName: user.user_metadata?.name || user.email?.split('@')[0] || 'Patient',
           reason: appointmentReason,
         },
       });
