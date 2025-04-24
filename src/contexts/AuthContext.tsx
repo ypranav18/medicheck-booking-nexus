@@ -11,8 +11,6 @@ interface AuthContextProps {
   signUp: (email: string, password: string, name: string) => Promise<{ error: any | null }>;
   signOut: () => Promise<void>;
   loading: boolean;
-  lastSignUpAttempt: number | null;
-  isRateLimited: boolean;
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
@@ -21,22 +19,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [lastSignUpAttempt, setLastSignUpAttempt] = useState<number | null>(null);
-  const [isRateLimited, setIsRateLimited] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
+    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
         setSession(newSession);
         setUser(newSession?.user ?? null);
 
+        // For debugging
         if (event) {
           console.log('Supabase auth event:', event);
         }
       }
     );
 
+    // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
@@ -69,74 +68,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, name: string) => {
     try {
-      // Check if we're currently rate limited
-      if (isRateLimited) {
-        const now = Date.now();
-        const elapsedMinutes = lastSignUpAttempt ? (now - lastSignUpAttempt) / (1000 * 60) : 0;
-        
-        if (elapsedMinutes < 15) {
-          const remainingMinutes = Math.ceil(15 - elapsedMinutes);
-          toast({
-            title: "Sign Up Limit Reached",
-            description: `Please wait approximately ${remainingMinutes} more minute${remainingMinutes !== 1 ? 's' : ''} before trying again.`,
-            variant: "destructive",
-          });
-          return { error: { message: "Rate limited. Please wait before trying again." } };
-        } else {
-          // Reset rate limit if enough time has passed
-          setIsRateLimited(false);
-        }
-      }
-      
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             name,
-          },
-          emailRedirectTo: window.location.origin,
+          }
         }
       });
 
-      if (error) {
-        // Handle rate limiting error specifically
-        if (error.code === 'over_email_send_rate_limit') {
-          setIsRateLimited(true);
-          setLastSignUpAttempt(Date.now());
-          
-          toast({
-            title: "Sign Up Limit Reached",
-            description: "Supabase has a limit on sign-ups from the same IP address. Please wait 15-30 minutes and try again, or try using a different network connection.",
-            variant: "destructive",
-          });
-        } else {
-          toast({
-            title: "Sign up failed",
-            description: error.message || "Unable to create account. Please try again.",
-            variant: "destructive",
-          });
-        }
-        return { error };
-      }
+      if (error) throw error;
       
-      if (data.user) {
-        toast({
-          title: "Account created successfully!",
-          description: "You have been signed in automatically.",
-        });
-        
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 1500);
-      }
+      toast({
+        title: "Account created!",
+        description: "Please check your email for verification instructions.",
+      });
       
       return { error: null };
-    } catch (error: any) {
-      console.error('Unexpected error signing up:', error);
+    } catch (error) {
+      console.error('Error signing up:', error);
       toast({
-        title: "Unexpected Error",
-        description: "An unexpected error occurred. Please try again later.",
+        title: "Sign up failed",
+        description: error.message || "Unable to create account. Please try again.",
         variant: "destructive",
       });
       return { error };
@@ -157,8 +111,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signUp,
     signOut,
     loading,
-    lastSignUpAttempt,
-    isRateLimited
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

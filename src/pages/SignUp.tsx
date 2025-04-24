@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,7 +10,6 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Form,
   FormControl,
@@ -20,7 +19,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -33,11 +31,8 @@ const formSchema = z.object({
 });
 
 const SignUp = () => {
-  const { signUp, user, isRateLimited, lastSignUpAttempt } = useAuth();
+  const { signUp, user } = useAuth();
   const navigate = useNavigate();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [signupError, setSignupError] = useState<string | null>(null);
-  const [remainingWaitTime, setRemainingWaitTime] = useState<number | null>(null);
   
   // Redirect to home if already logged in
   useEffect(() => {
@@ -45,28 +40,6 @@ const SignUp = () => {
       navigate('/');
     }
   }, [user, navigate]);
-  
-  // Calculate remaining wait time if rate limited
-  useEffect(() => {
-    if (isRateLimited && lastSignUpAttempt) {
-      const updateRemainingTime = () => {
-        const now = Date.now();
-        const elapsedMinutes = (now - lastSignUpAttempt) / (1000 * 60);
-        const remaining = Math.ceil(15 - elapsedMinutes);
-        
-        if (remaining > 0) {
-          setRemainingWaitTime(remaining);
-        } else {
-          setRemainingWaitTime(null);
-        }
-      };
-      
-      updateRemainingTime();
-      const interval = setInterval(updateRemainingTime, 30000); // Update every 30 seconds
-      
-      return () => clearInterval(interval);
-    }
-  }, [isRateLimited, lastSignUpAttempt]);
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -79,19 +52,10 @@ const SignUp = () => {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsSubmitting(true);
-    setSignupError(null);
+    const { error } = await signUp(values.email, values.password, values.name);
     
-    try {
-      const { error } = await signUp(values.email, values.password, values.name);
-      
-      if (error) {
-        setSignupError(error.message || "An error occurred during sign up. Please try again.");
-      }
-    } catch (err: any) {
-      setSignupError(err.message || "An unexpected error occurred. Please try again.");
-    } finally {
-      setIsSubmitting(false);
+    if (!error) {
+      navigate('/signin');
     }
   }
 
@@ -108,21 +72,6 @@ const SignUp = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {signupError && (
-                <Alert variant="destructive" className="mb-6">
-                  <AlertDescription>{signupError}</AlertDescription>
-                </Alert>
-              )}
-              
-              {isRateLimited && remainingWaitTime && (
-                <Alert className="mb-6 bg-amber-50 border-amber-200">
-                  <AlertDescription className="text-amber-700">
-                    <p className="font-semibold">Sign Up Limit Reached</p>
-                    <p>Please wait approximately {remainingWaitTime} minute{remainingWaitTime !== 1 ? 's' : ''} before trying again, or try using a different network connection.</p>
-                  </AlertDescription>
-                </Alert>
-              )}
-              
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   <FormField
@@ -132,7 +81,7 @@ const SignUp = () => {
                       <FormItem>
                         <FormLabel>Full Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="John Doe" {...field} disabled={isSubmitting || isRateLimited} />
+                          <Input placeholder="John Doe" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -145,7 +94,7 @@ const SignUp = () => {
                       <FormItem>
                         <FormLabel>Email</FormLabel>
                         <FormControl>
-                          <Input placeholder="your.email@example.com" {...field} disabled={isSubmitting || isRateLimited} />
+                          <Input placeholder="your.email@example.com" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -158,7 +107,7 @@ const SignUp = () => {
                       <FormItem>
                         <FormLabel>Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••" {...field} disabled={isSubmitting || isRateLimited} />
+                          <Input type="password" placeholder="••••••" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -171,25 +120,14 @@ const SignUp = () => {
                       <FormItem>
                         <FormLabel>Confirm Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••" {...field} disabled={isSubmitting || isRateLimited} />
+                          <Input type="password" placeholder="••••••" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <Button 
-                    type="submit" 
-                    className="w-full bg-medical-primary hover:bg-medical-dark"
-                    disabled={isSubmitting || isRateLimited}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Creating Account...
-                      </>
-                    ) : (
-                      'Sign Up'
-                    )}
+                  <Button type="submit" className="w-full bg-medical-primary hover:bg-medical-dark">
+                    Sign Up
                   </Button>
                 </form>
               </Form>
