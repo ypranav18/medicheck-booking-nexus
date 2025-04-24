@@ -1,10 +1,10 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { useToast } from "@/hooks/use-toast";
+import { useAuth } from '@/contexts/AuthContext';
 
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -26,8 +26,15 @@ const formSchema = z.object({
 });
 
 const SignIn = () => {
-  const { toast } = useToast();
+  const { signIn, user } = useAuth();
   const navigate = useNavigate();
+  
+  // Redirect to home if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate('/');
+    }
+  }, [user, navigate]);
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -37,14 +44,10 @@ const SignIn = () => {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    // For now, we'll just create a mock authentication
-    // In a real app, this would connect to your authentication backend
-    if (values.email && values.password) {
-      toast({
-        title: "Success!",
-        description: "You have successfully signed in.",
-      });
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    const { error } = await signIn(values.email, values.password);
+    
+    if (!error) {
       navigate('/');
     }
   }
