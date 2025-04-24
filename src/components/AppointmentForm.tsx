@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -54,18 +53,20 @@ const AppointmentForm = () => {
         return;
       }
 
-      // Store appointment in Supabase - Fix: doctor_id is now explicitly converted to string
+      // Store appointment in Supabase
       const { error: appointmentError } = await supabase
         .from('appointments')
-        .insert({
-          user_id: user.id,
-          doctor_id: selectedDoctor.id.toString(), // Explicitly convert number to string
-          doctor_name: selectedDoctor.name,
-          doctor_specialty: selectedDoctor.specialty,
-          appointment_date: selectedDay,
-          appointment_time: selectedTime,
-          reason: appointmentReason,
-        });
+        .insert([
+          {
+            user_id: user.id,
+            doctor_id: selectedDoctor.id,
+            doctor_name: selectedDoctor.name,
+            doctor_specialty: selectedDoctor.specialty,
+            appointment_date: selectedDay,
+            appointment_time: selectedTime,
+            reason: appointmentReason,
+          }
+        ]);
 
       if (appointmentError) {
         throw appointmentError;

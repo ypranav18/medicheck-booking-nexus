@@ -1,16 +1,15 @@
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from "@/hooks/use-toast";
 
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Form,
   FormControl,
@@ -20,7 +19,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -33,17 +31,8 @@ const formSchema = z.object({
 });
 
 const SignUp = () => {
-  const { signUp, user } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [signupError, setSignupError] = useState<string | null>(null);
-  
-  // Redirect to home if already logged in
-  useEffect(() => {
-    if (user) {
-      navigate('/');
-    }
-  }, [user, navigate]);
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -55,20 +44,15 @@ const SignUp = () => {
     },
   });
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsSubmitting(true);
-    setSignupError(null);
-    
-    try {
-      const { error } = await signUp(values.email, values.password, values.name);
-      
-      if (error) {
-        setSignupError(error.message || "An error occurred during sign up. Please try again.");
-      }
-    } catch (err: any) {
-      setSignupError(err.message || "An unexpected error occurred. Please try again.");
-    } finally {
-      setIsSubmitting(false);
+  function onSubmit(values: z.infer<typeof formSchema>) {
+    // For now, we'll just create a mock registration
+    // In a real app, this would connect to your authentication backend
+    if (values.email && values.password) {
+      toast({
+        title: "Account created!",
+        description: "You have successfully signed up.",
+      });
+      navigate('/signin');
     }
   }
 
@@ -85,11 +69,6 @@ const SignUp = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {signupError && (
-                <Alert variant="destructive" className="mb-6">
-                  <AlertDescription>{signupError}</AlertDescription>
-                </Alert>
-              )}
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   <FormField
@@ -99,7 +78,7 @@ const SignUp = () => {
                       <FormItem>
                         <FormLabel>Full Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="John Doe" {...field} disabled={isSubmitting} />
+                          <Input placeholder="John Doe" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -112,7 +91,7 @@ const SignUp = () => {
                       <FormItem>
                         <FormLabel>Email</FormLabel>
                         <FormControl>
-                          <Input placeholder="your.email@example.com" {...field} disabled={isSubmitting} />
+                          <Input placeholder="your.email@example.com" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -125,7 +104,7 @@ const SignUp = () => {
                       <FormItem>
                         <FormLabel>Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••" {...field} disabled={isSubmitting} />
+                          <Input type="password" placeholder="••••••" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -138,25 +117,14 @@ const SignUp = () => {
                       <FormItem>
                         <FormLabel>Confirm Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••" {...field} disabled={isSubmitting} />
+                          <Input type="password" placeholder="••••••" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <Button 
-                    type="submit" 
-                    className="w-full bg-medical-primary hover:bg-medical-dark"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Creating Account...
-                      </>
-                    ) : (
-                      'Sign Up'
-                    )}
+                  <Button type="submit" className="w-full bg-medical-primary hover:bg-medical-dark">
+                    Sign Up
                   </Button>
                 </form>
               </Form>
