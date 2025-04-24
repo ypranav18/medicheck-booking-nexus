@@ -54,12 +54,12 @@ const AppointmentForm = () => {
         return;
       }
 
-      // Store appointment in Supabase - Fix: Convert doctor_id to string and pass as single object
+      // Store appointment in Supabase - Fix: doctor_id is now explicitly converted to string
       const { error: appointmentError } = await supabase
         .from('appointments')
         .insert({
           user_id: user.id,
-          doctor_id: selectedDoctor.id.toString(), // Convert number to string
+          doctor_id: selectedDoctor.id.toString(), // Explicitly convert number to string
           doctor_name: selectedDoctor.name,
           doctor_specialty: selectedDoctor.specialty,
           appointment_date: selectedDay,
