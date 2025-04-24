@@ -68,22 +68,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, name: string) => {
     try {
-      const { error } = await supabase.auth.signUp({
+      // Modified to disable email confirmation
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             name,
-          }
+          },
+          emailRedirectTo: window.location.origin,
         }
       });
 
       if (error) throw error;
       
-      toast({
-        title: "Account created!",
-        description: "Please check your email for verification instructions.",
-      });
+      // Auto sign-in after registration since we're not requiring email confirmation
+      if (data.user) {
+        toast({
+          title: "Account created successfully!",
+          description: "You have been signed in automatically.",
+        });
+        
+        // Wait a moment before redirecting to ensure state is updated
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1500);
+      }
       
       return { error: null };
     } catch (error) {

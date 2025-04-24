@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,6 +10,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Form,
   FormControl,
@@ -19,6 +20,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -33,6 +35,8 @@ const formSchema = z.object({
 const SignUp = () => {
   const { signUp, user } = useAuth();
   const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [signupError, setSignupError] = useState<string | null>(null);
   
   // Redirect to home if already logged in
   useEffect(() => {
@@ -52,10 +56,19 @@ const SignUp = () => {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    const { error } = await signUp(values.email, values.password, values.name);
+    setIsSubmitting(true);
+    setSignupError(null);
     
-    if (!error) {
-      navigate('/signin');
+    try {
+      const { error } = await signUp(values.email, values.password, values.name);
+      
+      if (error) {
+        setSignupError(error.message || "An error occurred during sign up. Please try again.");
+      }
+    } catch (err: any) {
+      setSignupError(err.message || "An unexpected error occurred. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -72,6 +85,11 @@ const SignUp = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {signupError && (
+                <Alert variant="destructive" className="mb-6">
+                  <AlertDescription>{signupError}</AlertDescription>
+                </Alert>
+              )}
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   <FormField
@@ -81,7 +99,7 @@ const SignUp = () => {
                       <FormItem>
                         <FormLabel>Full Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="John Doe" {...field} />
+                          <Input placeholder="John Doe" {...field} disabled={isSubmitting} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -94,7 +112,7 @@ const SignUp = () => {
                       <FormItem>
                         <FormLabel>Email</FormLabel>
                         <FormControl>
-                          <Input placeholder="your.email@example.com" {...field} />
+                          <Input placeholder="your.email@example.com" {...field} disabled={isSubmitting} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -107,7 +125,7 @@ const SignUp = () => {
                       <FormItem>
                         <FormLabel>Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••" {...field} />
+                          <Input type="password" placeholder="••••••" {...field} disabled={isSubmitting} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -120,14 +138,25 @@ const SignUp = () => {
                       <FormItem>
                         <FormLabel>Confirm Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••" {...field} />
+                          <Input type="password" placeholder="••••••" {...field} disabled={isSubmitting} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="w-full bg-medical-primary hover:bg-medical-dark">
-                    Sign Up
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-medical-primary hover:bg-medical-dark"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creating Account...
+                      </>
+                    ) : (
+                      'Sign Up'
+                    )}
                   </Button>
                 </form>
               </Form>
