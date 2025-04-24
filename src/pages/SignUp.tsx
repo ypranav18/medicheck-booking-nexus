@@ -33,10 +33,11 @@ const formSchema = z.object({
 });
 
 const SignUp = () => {
-  const { signUp, user } = useAuth();
+  const { signUp, user, isRateLimited, lastSignUpAttempt } = useAuth();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [signupError, setSignupError] = useState<string | null>(null);
+  const [remainingWaitTime, setRemainingWaitTime] = useState<number | null>(null);
   
   // Redirect to home if already logged in
   useEffect(() => {
@@ -44,6 +45,28 @@ const SignUp = () => {
       navigate('/');
     }
   }, [user, navigate]);
+  
+  // Calculate remaining wait time if rate limited
+  useEffect(() => {
+    if (isRateLimited && lastSignUpAttempt) {
+      const updateRemainingTime = () => {
+        const now = Date.now();
+        const elapsedMinutes = (now - lastSignUpAttempt) / (1000 * 60);
+        const remaining = Math.ceil(15 - elapsedMinutes);
+        
+        if (remaining > 0) {
+          setRemainingWaitTime(remaining);
+        } else {
+          setRemainingWaitTime(null);
+        }
+      };
+      
+      updateRemainingTime();
+      const interval = setInterval(updateRemainingTime, 30000); // Update every 30 seconds
+      
+      return () => clearInterval(interval);
+    }
+  }, [isRateLimited, lastSignUpAttempt]);
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -90,6 +113,16 @@ const SignUp = () => {
                   <AlertDescription>{signupError}</AlertDescription>
                 </Alert>
               )}
+              
+              {isRateLimited && remainingWaitTime && (
+                <Alert className="mb-6 bg-amber-50 border-amber-200">
+                  <AlertDescription className="text-amber-700">
+                    <p className="font-semibold">Sign Up Limit Reached</p>
+                    <p>Please wait approximately {remainingWaitTime} minute{remainingWaitTime !== 1 ? 's' : ''} before trying again, or try using a different network connection.</p>
+                  </AlertDescription>
+                </Alert>
+              )}
+              
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   <FormField
@@ -99,7 +132,7 @@ const SignUp = () => {
                       <FormItem>
                         <FormLabel>Full Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="John Doe" {...field} disabled={isSubmitting} />
+                          <Input placeholder="John Doe" {...field} disabled={isSubmitting || isRateLimited} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -112,7 +145,7 @@ const SignUp = () => {
                       <FormItem>
                         <FormLabel>Email</FormLabel>
                         <FormControl>
-                          <Input placeholder="your.email@example.com" {...field} disabled={isSubmitting} />
+                          <Input placeholder="your.email@example.com" {...field} disabled={isSubmitting || isRateLimited} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -125,7 +158,7 @@ const SignUp = () => {
                       <FormItem>
                         <FormLabel>Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••" {...field} disabled={isSubmitting} />
+                          <Input type="password" placeholder="••••••" {...field} disabled={isSubmitting || isRateLimited} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -138,7 +171,7 @@ const SignUp = () => {
                       <FormItem>
                         <FormLabel>Confirm Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••" {...field} disabled={isSubmitting} />
+                          <Input type="password" placeholder="••••••" {...field} disabled={isSubmitting || isRateLimited} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -147,7 +180,7 @@ const SignUp = () => {
                   <Button 
                     type="submit" 
                     className="w-full bg-medical-primary hover:bg-medical-dark"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isRateLimited}
                   >
                     {isSubmitting ? (
                       <>
